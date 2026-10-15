@@ -1,0 +1,13 @@
+export { systemRoutes } from './system.ts';
+export { uploadRoutes } from './upload.ts';
+export { referralsRoutes } from './referrals.ts';
+export { eventsRoutes } from './events.ts';
+export { tasksRoutes } from './tasks.ts';
+export { coursesRoutes } from './courses.ts';
+export { usersRoutes } from './users.ts';
+export { plansRoutes } from './plans.ts';
+export { walletRoutes } from './wallet.ts';
+export { adminRoutes } from './admin.ts';
+export { authRoutes } from './auth.ts';
+export { mentorRoutes } from './mentor.ts';
+export { ticketsRoutes } from './tickets.ts';

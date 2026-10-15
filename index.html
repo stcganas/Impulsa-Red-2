@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Google AI Studio App</title>
+  </head>
+  <body>
+    <script>
+      // Suppress benign WebSocket / Vite HMR errors in development
+      window.addEventListener('unhandledrejection', function(event) {
+        var reasonStr = event.reason ? (event.reason.message || String(event.reason)) : '';
+        if (
+          reasonStr.indexOf('WebSocket') !== -1 ||
+          reasonStr.indexOf('closed without opened') !== -1 ||
+          reasonStr.indexOf('failed to connect to websocket') !== -1
+        ) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+        }
+      });
+      window.addEventListener('error', function(event) {
+        var msg = event.message || '';
+        if (
+          msg.indexOf('WebSocket') !== -1 ||
+          msg.indexOf('closed without opened') !== -1 ||
+          msg.indexOf('failed to connect to websocket') !== -1
+        ) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+        }
+      });
+    </script>
+    <div id="root">
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; background: #0f172a; color: white;">
+        <div style="width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.1); border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+        <p style="margin-top: 20px; font-weight: 600; letter-spacing: 0.05em;">INICIANDO IMPULSARED...</p>
+        <style>
+          @keyframes spin { to { transform: rotate(360deg); } }
+        </style>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

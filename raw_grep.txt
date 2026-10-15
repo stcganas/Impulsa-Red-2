@@ -1,0 +1,386 @@
+./src/components/viral/ExitIntentModal.tsx:            await supabase.from('conversion_events').insert({
+./src/components/admin/FeatureManager.tsx:        const { error } = await supabase.from('features').update(payload).eq('id', id);
+./src/components/admin/FeatureManager.tsx:        const { error } = await supabase.from('features').insert(payload);
+./src/components/admin/FeatureManager.tsx:      const { error } = await supabase.from('features').delete().eq('id', id);
+./src/components/admin/PlanFeatureEditor.tsx:      const { error } = await supabase.from('plan_features').upsert(updates, { onConflict: 'plan_id,feature_id' });
+./src/components/admin/PlanManager.tsx:        const { error } = await supabase.from('plans').update(formData).eq('id', id);
+./src/components/admin/PlanManager.tsx:        const { error } = await supabase.from('plans').insert(formData);
+./src/components/admin/PlanManager.tsx:      const { error } = await supabase.from('plans').delete().eq('id', id);
+./src/components/InviteEditor.tsx:        .from('users')
+./src/components/TaskManagement.tsx:        .from('settings')
+./src/components/TaskManagement.tsx:        .from('tasks')
+./src/components/tasks/TaskList.tsx:        .from('tasks')
+./src/components/tasks/TaskList.tsx:        .from('user_tasks')
+./src/components/InviteButtons.tsx:      await supabase.from('conversion_events').insert({
+./src/components/AdvancedStats.tsx:          .from('transactions')
+./src/components/NotificationCenter.tsx:        .from('notifications')
+./src/components/NotificationCenter.tsx:        .from('notifications')
+./src/components/NotificationCenter.tsx:        .from('notifications')
+./src/components/UserManagement.tsx:        .from('tasks')
+./src/components/UserManagement.tsx:        .from('user_tasks')
+./src/components/UserManagement.tsx:        .from('penalty_tasks')
+./src/components/CourseManagement.tsx:        .from('settings')
+./src/components/CourseManagement.tsx:        .from('settings')
+./src/pages/Training.tsx:        .from('settings')
+./src/pages/Training.tsx:        .from('user_courses')
+./src/pages/InviteLandingPage.tsx:            await supabase.from('conversion_events').insert({
+./src/pages/InviteLandingPage.tsx:          .from('users')
+./src/pages/InviteLandingPage.tsx:          .from('referrals')
+./src/pages/InviteLandingPage.tsx:          .from('referrals')
+./src/pages/Register.tsx:        .from('users')
+./src/pages/Register.tsx:          await supabase.from('conversion_events').insert({
+./src/pages/Referrals.tsx:          .from('conversion_events')
+./src/pages/Referrals.tsx:        .from('referrals')
+./src/pages/Referrals.tsx:        .from('transactions')
+./src/pages/Tasks.tsx:        .from('settings')
+./src/pages/Tasks.tsx:        .from('tasks')
+./src/pages/Tasks.tsx:        .from('user_tasks')
+./src/pages/Wallet.tsx:        .from('transactions')
+./src/pages/Profile.tsx:          .from('users')
+./src/pages/Profile.tsx:        .from('users')
+./src/pages/PlanSelection.tsx:        .from('plans')
+./src/pages/Ranking.tsx:          .from('users')
+./src/pages/LandingPage.tsx:        .from('plans')
+./src/contexts/FeatureContext.tsx:        supabase.from('plans').select('*').order('level', { ascending: true }),
+./src/contexts/FeatureContext.tsx:        supabase.from('features').select('*'),
+./src/contexts/FeatureContext.tsx:        supabase.from('plan_features').select('*')
+./test-supabase.ts:  const { data, error } = await supabase.from('users').select('*').limit(1);
+./server.ts:        .from('users')
+./server.ts:        .from('users')
+./server.ts:        .from('referrals')
+./server.ts:        .from('referrals')
+./server.ts:        .from('referrals')
+./server.ts:      const { data: refProfile } = await supabase.from('users').select('xp, level, plan').eq('id', referrer.id).single();
+./server.ts:        await supabase.from('users').update({ xp: newXp, level: newLevel, percentage: newPercentage }).eq('id', referrer.id);
+./server.ts:        .from('referrals')
+./server.ts:        const { data: ref2Profile } = await supabase.from('users').select('xp, level, plan').eq('id', level2Referral.referrer_id).single();
+./server.ts:          await supabase.from('users').update({ xp: newXp2, level: newLevel2, percentage: newPercentage2 }).eq('id', level2Referral.referrer_id);
+./server.ts:      const { data: newUser } = await supabase.from('users').select('name').eq('id', user.id).single();
+./server.ts:      await supabase.from('notifications').insert({
+./server.ts:          .from('referrals')
+./server.ts:        .from('invite_clicks')
+./server.ts:        .from('users')
+./server.ts:        .from('invite_clicks')
+./server.ts:        .from('referrals')
+./server.ts:        .from('users')
+./server.ts:        .from('users')
+./server.ts:        await supabase.from('users').update({ last_reset_at: now.toISOString() }).eq('id', userId);
+./server.ts:        .from('tasks')
+./server.ts:        .from('user_tasks')
+./server.ts:              .from('user_tasks')
+./server.ts:              .from('user_tasks')
+./server.ts:      await supabase.from('events').insert(event);
+./server.ts:        .from('user_tasks')
+./server.ts:        .from('user_tasks')
+./server.ts:        .from('users')
+./server.ts:          .from('users')
+./server.ts:        .from('tasks')
+./server.ts:        .from('user_tasks')
+./server.ts:        .from('user_tasks')
+./server.ts:        .from('users')
+./server.ts:        .from('users')
+./server.ts:        .from('user_courses')
+./server.ts:        .from('user_courses')
+./server.ts:        .from('users')
+./server.ts:        .from('users')
+./server.ts:        .from('referrals')
+./server.ts:          .from('users')
+./server.ts:        .from('transactions')
+./server.ts:      const { data: profile } = await supabase.from('users').select('trust_score').eq('id', user.id).single();
+./server.ts:        await supabase.from('users').update({ trust_score: newScore }).eq('id', user.id);
+./server.ts:        .from('transactions')
+./server.ts:        .from('users')
+./server.ts:    const { data: userProfile } = await supabase.from('users').select('level').eq('id', tx.user_id).single();
+./server.ts:      .from('plans')
+./server.ts:      .from('users')
+./server.ts:        .from('referrals')
+./server.ts:        .from('users')
+./server.ts:          await supabase.from('transactions').insert({
+./server.ts:          await supabase.from('notifications').insert({
+./server.ts:          const { data: refProfile } = await supabase.from('users').select('xp, level, plan').eq('id', referral.referrer_id).single();
+./server.ts:            await supabase.from('users').update({ xp: newXp, level: newLevel, percentage: newPercentage }).eq('id', referral.referrer_id);
+./server.ts:    await supabase.from('notifications').insert({
+./server.ts:        .from('plans')
+./server.ts:          .from('transactions')
+./server.ts:          .from('transactions')
+./server.ts:        .from('transactions')
+./server.ts:        .from('transactions')
+./server.ts:        .from('transactions')
+./server.ts:        .from('transactions')
+./server.ts:        .from('transactions')
+./server.ts:        await supabase.from('notifications').insert({
+./server.ts:        .from('users')
+./server.ts:        .from('users')
+./server.ts:        .from('users')
+./server.ts:        .from('transactions')
+./server.ts:        .from('transactions')
+./server.ts:          .from('users')
+./server.ts:        .from('tickets')
+./server.ts:        .from('users')
+./server.ts:        .from('referrals')
+./server.ts:      let query = supabase.from('users').select('id');
+./server.ts:        const { error: insertError } = await supabase.from('notifications').insert(batch);
+./server.ts:      const { data: adminProfile } = await supabase.from('users').select('role').eq('id', adminUser.id).single();
+./server.ts:        .from('transactions')
+./server.ts:      const { data: adminProfile } = await supabase.from('users').select('role').eq('id', adminUser.id).single();
+./server.ts:      const { data, error } = await supabase.from('settings').select('*');
+./server.ts:      const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+./server.ts:        .from('settings')
+./server.ts:          await supabase.from('users').update({ percentage: expectedPercentage }).eq('id', user.id);
+./server.ts:          .from('transactions')
+./server.ts:      .from('users')
+./server.ts:          .from('users')
+./server.ts:        .from('users')
+./server.ts:      await supabase.from('notifications').insert({
+./server.ts:        const { data: allTasks } = await supabase.from('tasks').select('*');
+./server.ts:          .from('user_tasks')
+./server.ts:          await supabase.from('penalty_tasks').insert(penaltyTasks);
+./server.ts:          await supabase.from('users').update({
+./server.ts:          await supabase.from('notifications').insert({
+./server.ts:          await supabase.from('users').update({
+./server.ts:          await supabase.from('notifications').insert({
+./server.ts:        await supabase.from('user_tasks').delete().eq('user_id', user.id);
+./server.ts:        .from('penalty_tasks')
+./server.ts:        .from('penalty_tasks')
+./server.ts:      await supabase.from('penalty_tasks').update({ is_completed: true }).eq('id', id);
+./server.ts:      const { data: profile } = await supabase.from('users').select('xp, level, plan').eq('id', authUser.id).single();
+./server.ts:        await supabase.from('users').update({ xp: newXp, level: newLevel, percentage: newPercentage }).eq('id', authUser.id);
+./server.ts:      const { error: dbError } = await supabase.from('users').select('id').limit(1);
+./server.ts:      const { data, error } = await supabase.from('tickets').insert({
+./server.ts:        .from('tickets')
+./server.ts:      const { data: profile, error: profileError } = await supabase.from('users').select('role').eq('id', user.id).single();
+./server.ts:        .from('tickets')
+./server.ts:      const { data: profile, error: profileError } = await supabase.from('users').select('role').eq('id', user.id).single();
+./server.ts:        .from('tickets')
+./server.ts:      await supabase.from('notifications').insert({
+./server.ts:        .from('users')
+./server.ts:        .from('users')
+./server.ts:      const { data: userTasks } = await supabase.from('user_tasks').select('user_id');
+./server.ts:      const { data: transactions } = await supabase.from('transactions').select('user_id, amount').eq('status', 'completed');
+./server.ts:      const { data: referrals } = await supabase.from('users').select('referred_by');
+./server.ts:      const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+./server.ts:        .from('users')
+./server.ts:      const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+./server.ts:      const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+./server.ts:          .from('tasks')
+./server.ts:      const { data, error } = await supabase.from('tasks').insert([{ 
+./server.ts:      const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+./server.ts:      const { error } = await supabase.from('tasks').insert(initialTasks);
+./server.ts:      const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+./server.ts:      const { data, error } = await supabase.from('tasks').update({ 
+./server.ts:      const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+./server.ts:      await supabase.from('user_tasks').delete().eq('task_id', id);
+./server.ts:      const { error } = await supabase.from('tasks').delete().eq('id', id);
+./server.ts:      const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+./server.ts:      await supabase.from('user_tasks').delete().neq('task_id', '00000000-0000-0000-0000-000000000000');
+./server.ts:      const { error } = await supabase.from('tasks').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+./server.ts:      const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+./server.ts:      const { data: users } = await supabase.from('users').select('id, xp, compliance_score');
+./server.ts:      const { data: tasks } = await supabase.from('tasks').select('id, name, xp');
+./server.ts:      const { data: userTasks } = await supabase.from('user_tasks').select('user_id, task_id');
+./server.ts:          await supabase.from('users').update({ 
+./server.ts:          await supabase.from('penalty_tasks').insert(penaltyTasksToInsert);
+./server.ts:          await supabase.from('notifications').insert({
+./server.ts:          await supabase.from('users').update({
+./server.ts:          await supabase.from('notifications').insert({
+./server.ts:      await supabase.from('user_tasks').delete().neq('task_id', '00000000-0000-0000-0000-000000000000');
+./server.ts:      const { data: existingSchedule } = await supabase.from('settings').select('id').eq('key', 'weekly_schedule').single();
+./server.ts:        await supabase.from('settings').update({ value: scheduleData }).eq('key', 'weekly_schedule');
+./server.ts:        await supabase.from('settings').insert({ key: 'weekly_schedule', value: scheduleData });
+./server.ts:      const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+./server.ts:      const { data: newTask, error } = await supabase.from('penalty_tasks').insert({
+./server.ts:      await supabase.from('notifications').insert({
+./test-supabase2.ts:  const { data, error } = await supabase.from('users').select('*').limit(1);
+./tables_raw.txt:./src/components/viral/ExitIntentModal.tsx:            await supabase.from('conversion_events').insert({
+./tables_raw.txt:./src/components/admin/FeatureManager.tsx:        const { error } = await supabase.from('features').update(payload).eq('id', id);
+./tables_raw.txt:./src/components/admin/FeatureManager.tsx:        const { error } = await supabase.from('features').insert(payload);
+./tables_raw.txt:./src/components/admin/FeatureManager.tsx:      const { error } = await supabase.from('features').delete().eq('id', id);
+./tables_raw.txt:./src/components/admin/PlanFeatureEditor.tsx:      const { error } = await supabase.from('plan_features').upsert(updates, { onConflict: 'plan_id,feature_id' });
+./tables_raw.txt:./src/components/admin/PlanManager.tsx:        const { error } = await supabase.from('plans').update(formData).eq('id', id);
+./tables_raw.txt:./src/components/admin/PlanManager.tsx:        const { error } = await supabase.from('plans').insert(formData);
+./tables_raw.txt:./src/components/admin/PlanManager.tsx:      const { error } = await supabase.from('plans').delete().eq('id', id);
+./tables_raw.txt:./src/components/InviteEditor.tsx:        .from('users')
+./tables_raw.txt:./src/components/TaskManagement.tsx:        .from('settings')
+./tables_raw.txt:./src/components/TaskManagement.tsx:        .from('tasks')
+./tables_raw.txt:./src/components/tasks/TaskList.tsx:        .from('tasks')
+./tables_raw.txt:./src/components/tasks/TaskList.tsx:        .from('user_tasks')
+./tables_raw.txt:./src/components/InviteButtons.tsx:      await supabase.from('conversion_events').insert({
+./tables_raw.txt:./src/components/AdvancedStats.tsx:          .from('transactions')
+./tables_raw.txt:./src/components/NotificationCenter.tsx:        .from('notifications')
+./tables_raw.txt:./src/components/NotificationCenter.tsx:        .from('notifications')
+./tables_raw.txt:./src/components/NotificationCenter.tsx:        .from('notifications')
+./tables_raw.txt:./src/components/UserManagement.tsx:        .from('tasks')
+./tables_raw.txt:./src/components/UserManagement.tsx:        .from('user_tasks')
+./tables_raw.txt:./src/components/UserManagement.tsx:        .from('penalty_tasks')
+./tables_raw.txt:./src/components/CourseManagement.tsx:        .from('settings')
+./tables_raw.txt:./src/components/CourseManagement.tsx:        .from('settings')
+./tables_raw.txt:./src/pages/Training.tsx:        .from('settings')
+./tables_raw.txt:./src/pages/Training.tsx:        .from('user_courses')
+./tables_raw.txt:./src/pages/InviteLandingPage.tsx:            await supabase.from('conversion_events').insert({
+./tables_raw.txt:./src/pages/InviteLandingPage.tsx:          .from('users')
+./tables_raw.txt:./src/pages/InviteLandingPage.tsx:          .from('referrals')
+./tables_raw.txt:./src/pages/InviteLandingPage.tsx:          .from('referrals')
+./tables_raw.txt:./src/pages/Register.tsx:        .from('users')
+./tables_raw.txt:./src/pages/Register.tsx:          await supabase.from('conversion_events').insert({
+./tables_raw.txt:./src/pages/Referrals.tsx:          .from('conversion_events')
+./tables_raw.txt:./src/pages/Referrals.tsx:        .from('referrals')
+./tables_raw.txt:./src/pages/Referrals.tsx:        .from('transactions')
+./tables_raw.txt:./src/pages/Tasks.tsx:        .from('settings')
+./tables_raw.txt:./src/pages/Tasks.tsx:        .from('tasks')
+./tables_raw.txt:./src/pages/Tasks.tsx:        .from('user_tasks')
+./tables_raw.txt:./src/pages/Wallet.tsx:        .from('transactions')
+./tables_raw.txt:./src/pages/Profile.tsx:          .from('users')
+./tables_raw.txt:./src/pages/Profile.tsx:        .from('users')
+./tables_raw.txt:./src/pages/PlanSelection.tsx:        .from('plans')
+./tables_raw.txt:./src/pages/Ranking.tsx:          .from('users')
+./tables_raw.txt:./src/pages/LandingPage.tsx:        .from('plans')
+./tables_raw.txt:./src/contexts/FeatureContext.tsx:        supabase.from('plans').select('*').order('level', { ascending: true }),
+./tables_raw.txt:./src/contexts/FeatureContext.tsx:        supabase.from('features').select('*'),
+./tables_raw.txt:./src/contexts/FeatureContext.tsx:        supabase.from('plan_features').select('*')
+./tables_raw.txt:./test-supabase.ts:  const { data, error } = await supabase.from('users').select('*').limit(1);
+./tables_raw.txt:./server.ts:        .from('users')
+./tables_raw.txt:./server.ts:        .from('users')
+./tables_raw.txt:./server.ts:        .from('referrals')
+./tables_raw.txt:./server.ts:        .from('referrals')
+./tables_raw.txt:./server.ts:        .from('referrals')
+./tables_raw.txt:./server.ts:      const { data: refProfile } = await supabase.from('users').select('xp, level, plan').eq('id', referrer.id).single();
+./tables_raw.txt:./server.ts:        await supabase.from('users').update({ xp: newXp, level: newLevel, percentage: newPercentage }).eq('id', referrer.id);
+./tables_raw.txt:./server.ts:        .from('referrals')
+./tables_raw.txt:./server.ts:        const { data: ref2Profile } = await supabase.from('users').select('xp, level, plan').eq('id', level2Referral.referrer_id).single();
+./tables_raw.txt:./server.ts:          await supabase.from('users').update({ xp: newXp2, level: newLevel2, percentage: newPercentage2 }).eq('id', level2Referral.referrer_id);
+./tables_raw.txt:./server.ts:      const { data: newUser } = await supabase.from('users').select('name').eq('id', user.id).single();
+./tables_raw.txt:./server.ts:      await supabase.from('notifications').insert({
+./tables_raw.txt:./server.ts:          .from('referrals')
+./tables_raw.txt:./server.ts:        .from('invite_clicks')
+./tables_raw.txt:./server.ts:        .from('users')
+./tables_raw.txt:./server.ts:        .from('invite_clicks')
+./tables_raw.txt:./server.ts:        .from('referrals')
+./tables_raw.txt:./server.ts:        .from('users')
+./tables_raw.txt:./server.ts:        .from('users')
+./tables_raw.txt:./server.ts:        await supabase.from('users').update({ last_reset_at: now.toISOString() }).eq('id', userId);
+./tables_raw.txt:./server.ts:        .from('tasks')
+./tables_raw.txt:./server.ts:        .from('user_tasks')
+./tables_raw.txt:./server.ts:              .from('user_tasks')
+./tables_raw.txt:./server.ts:              .from('user_tasks')
+./tables_raw.txt:./server.ts:      await supabase.from('events').insert(event);
+./tables_raw.txt:./server.ts:        .from('user_tasks')
+./tables_raw.txt:./server.ts:        .from('user_tasks')
+./tables_raw.txt:./server.ts:        .from('users')
+./tables_raw.txt:./server.ts:          .from('users')
+./tables_raw.txt:./server.ts:        .from('tasks')
+./tables_raw.txt:./server.ts:        .from('user_tasks')
+./tables_raw.txt:./server.ts:        .from('user_tasks')
+./tables_raw.txt:./server.ts:        .from('users')
+./tables_raw.txt:./server.ts:        .from('users')
+./tables_raw.txt:./server.ts:        .from('user_courses')
+./tables_raw.txt:./server.ts:        .from('user_courses')
+./tables_raw.txt:./server.ts:        .from('users')
+./tables_raw.txt:./server.ts:        .from('users')
+./tables_raw.txt:./server.ts:        .from('referrals')
+./tables_raw.txt:./server.ts:          .from('users')
+./tables_raw.txt:./server.ts:        .from('transactions')
+./tables_raw.txt:./server.ts:      const { data: profile } = await supabase.from('users').select('trust_score').eq('id', user.id).single();
+./tables_raw.txt:./server.ts:        await supabase.from('users').update({ trust_score: newScore }).eq('id', user.id);
+./tables_raw.txt:./server.ts:        .from('transactions')
+./tables_raw.txt:./server.ts:        .from('users')
+./tables_raw.txt:./server.ts:    const { data: userProfile } = await supabase.from('users').select('level').eq('id', tx.user_id).single();
+./tables_raw.txt:./server.ts:      .from('plans')
+./tables_raw.txt:./server.ts:      .from('users')
+./tables_raw.txt:./server.ts:        .from('referrals')
+./tables_raw.txt:./server.ts:        .from('users')
+./tables_raw.txt:./server.ts:          await supabase.from('transactions').insert({
+./tables_raw.txt:./server.ts:          await supabase.from('notifications').insert({
+./tables_raw.txt:./server.ts:          const { data: refProfile } = await supabase.from('users').select('xp, level, plan').eq('id', referral.referrer_id).single();
+./tables_raw.txt:./server.ts:            await supabase.from('users').update({ xp: newXp, level: newLevel, percentage: newPercentage }).eq('id', referral.referrer_id);
+./tables_raw.txt:./server.ts:    await supabase.from('notifications').insert({
+./tables_raw.txt:./server.ts:        .from('plans')
+./tables_raw.txt:./server.ts:          .from('transactions')
+./tables_raw.txt:./server.ts:          .from('transactions')
+./tables_raw.txt:./server.ts:        .from('transactions')
+./tables_raw.txt:./server.ts:        .from('transactions')
+./tables_raw.txt:./server.ts:        .from('transactions')
+./tables_raw.txt:./server.ts:        .from('transactions')
+./tables_raw.txt:./server.ts:        .from('transactions')
+./tables_raw.txt:./server.ts:        await supabase.from('notifications').insert({
+./tables_raw.txt:./server.ts:        .from('users')
+./tables_raw.txt:./server.ts:        .from('users')
+./tables_raw.txt:./server.ts:        .from('users')
+./tables_raw.txt:./server.ts:        .from('transactions')
+./tables_raw.txt:./server.ts:        .from('transactions')
+./tables_raw.txt:./server.ts:          .from('users')
+./tables_raw.txt:./server.ts:        .from('tickets')
+./tables_raw.txt:./server.ts:        .from('users')
+./tables_raw.txt:./server.ts:        .from('referrals')
+./tables_raw.txt:./server.ts:      let query = supabase.from('users').select('id');
+./tables_raw.txt:./server.ts:        const { error: insertError } = await supabase.from('notifications').insert(batch);
+./tables_raw.txt:./server.ts:      const { data: adminProfile } = await supabase.from('users').select('role').eq('id', adminUser.id).single();
+./tables_raw.txt:./server.ts:        .from('transactions')
+./tables_raw.txt:./server.ts:      const { data: adminProfile } = await supabase.from('users').select('role').eq('id', adminUser.id).single();
+./tables_raw.txt:./server.ts:      const { data, error } = await supabase.from('settings').select('*');
+./tables_raw.txt:./server.ts:      const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+./tables_raw.txt:./server.ts:        .from('settings')
+./tables_raw.txt:./server.ts:          await supabase.from('users').update({ percentage: expectedPercentage }).eq('id', user.id);
+./tables_raw.txt:./server.ts:          .from('transactions')
+./tables_raw.txt:./server.ts:      .from('users')
+./tables_raw.txt:./server.ts:          .from('users')
+./tables_raw.txt:./server.ts:        .from('users')
+./tables_raw.txt:./server.ts:      await supabase.from('notifications').insert({
+./tables_raw.txt:./server.ts:        const { data: allTasks } = await supabase.from('tasks').select('*');
+./tables_raw.txt:./server.ts:          .from('user_tasks')
+./tables_raw.txt:./server.ts:          await supabase.from('penalty_tasks').insert(penaltyTasks);
+./tables_raw.txt:./server.ts:          await supabase.from('users').update({
+./tables_raw.txt:./server.ts:          await supabase.from('notifications').insert({
+./tables_raw.txt:./server.ts:          await supabase.from('users').update({
+./tables_raw.txt:./server.ts:          await supabase.from('notifications').insert({
+./tables_raw.txt:./server.ts:        await supabase.from('user_tasks').delete().eq('user_id', user.id);
+./tables_raw.txt:./server.ts:        .from('penalty_tasks')
+./tables_raw.txt:./server.ts:        .from('penalty_tasks')
+./tables_raw.txt:./server.ts:      await supabase.from('penalty_tasks').update({ is_completed: true }).eq('id', id);
+./tables_raw.txt:./server.ts:      const { data: profile } = await supabase.from('users').select('xp, level, plan').eq('id', authUser.id).single();
+./tables_raw.txt:./server.ts:        await supabase.from('users').update({ xp: newXp, level: newLevel, percentage: newPercentage }).eq('id', authUser.id);
+./tables_raw.txt:./server.ts:      const { error: dbError } = await supabase.from('users').select('id').limit(1);
+./tables_raw.txt:./server.ts:      const { data, error } = await supabase.from('tickets').insert({
+./tables_raw.txt:./server.ts:        .from('tickets')
+./tables_raw.txt:./server.ts:      const { data: profile, error: profileError } = await supabase.from('users').select('role').eq('id', user.id).single();
+./tables_raw.txt:./server.ts:        .from('tickets')
+./tables_raw.txt:./server.ts:      const { data: profile, error: profileError } = await supabase.from('users').select('role').eq('id', user.id).single();
+./tables_raw.txt:./server.ts:        .from('tickets')
+./tables_raw.txt:./server.ts:      await supabase.from('notifications').insert({
+./tables_raw.txt:./server.ts:        .from('users')
+./tables_raw.txt:./server.ts:        .from('users')
+./tables_raw.txt:./server.ts:      const { data: userTasks } = await supabase.from('user_tasks').select('user_id');
+./tables_raw.txt:./server.ts:      const { data: transactions } = await supabase.from('transactions').select('user_id, amount').eq('status', 'completed');
+./tables_raw.txt:./server.ts:      const { data: referrals } = await supabase.from('users').select('referred_by');
+./tables_raw.txt:./server.ts:      const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+./tables_raw.txt:./server.ts:        .from('users')
+./tables_raw.txt:./server.ts:      const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+./tables_raw.txt:./server.ts:      const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+./tables_raw.txt:./server.ts:          .from('tasks')
+./tables_raw.txt:./server.ts:      const { data, error } = await supabase.from('tasks').insert([{ 
+./tables_raw.txt:./server.ts:      const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+./tables_raw.txt:./server.ts:      const { error } = await supabase.from('tasks').insert(initialTasks);
+./tables_raw.txt:./server.ts:      const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+./tables_raw.txt:./server.ts:      const { data, error } = await supabase.from('tasks').update({ 
+./tables_raw.txt:./server.ts:      const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+./tables_raw.txt:./server.ts:      await supabase.from('user_tasks').delete().eq('task_id', id);
+./tables_raw.txt:./server.ts:      const { error } = await supabase.from('tasks').delete().eq('id', id);
+./tables_raw.txt:./server.ts:      const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+./tables_raw.txt:./server.ts:      await supabase.from('user_tasks').delete().neq('task_id', '00000000-0000-0000-0000-000000000000');
+./tables_raw.txt:./server.ts:      const { error } = await supabase.from('tasks').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+./tables_raw.txt:./server.ts:      const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+./tables_raw.txt:./server.ts:      const { data: users } = await supabase.from('users').select('id, xp, compliance_score');
+./tables_raw.txt:./server.ts:      const { data: tasks } = await supabase.from('tasks').select('id, name, xp');
+./tables_raw.txt:./server.ts:      const { data: userTasks } = await supabase.from('user_tasks').select('user_id, task_id');
+./tables_raw.txt:./server.ts:          await supabase.from('users').update({ 
+./tables_raw.txt:./server.ts:          await supabase.from('penalty_tasks').insert(penaltyTasksToInsert);
+./tables_raw.txt:./server.ts:          await supabase.from('notifications').insert({
+./tables_raw.txt:./server.ts:          await supabase.from('users').update({
+./tables_raw.txt:./server.ts:          await supabase.from('notifications').insert({
+./tables_raw.txt:./server.ts:      await supabase.from('user_tasks').delete().neq('task_id', '00000000-0000-0000-0000-000000000000');
+./tables_raw.txt:./server.ts:      const { data: existingSchedule } = await supabase.from('settings').select('id').eq('key', 'weekly_schedule').single();
+./tables_raw.txt:./server.ts:        await supabase.from('settings').update({ value: scheduleData }).eq('key', 'weekly_schedule');
+./tables_raw.txt:./server.ts:        await supabase.from('settings').insert({ key: 'weekly_schedule', value: scheduleData });
+./tables_raw.txt:./server.ts:      const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+./tables_raw.txt:./server.ts:      const { data: newTask, error } = await supabase.from('penalty_tasks').insert({
+./tables_raw.txt:./server.ts:      await supabase.from('notifications').insert({
+./tables_raw.txt:./test-supabase2.ts:  const { data, error } = await supabase.from('users').select('*').limit(1);

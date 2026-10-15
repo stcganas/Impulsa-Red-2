@@ -1,0 +1,56 @@
+{
+  "entities": {
+    "users": {
+      "title": "User Profile",
+      "description": "Extended user data stored in public.users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "plan": { "type": "string" },
+        "level": { "type": "number" },
+        "xp": { "type": "number" },
+        "percentage": { "type": "number" },
+        "trust_score": { "type": "number" },
+        "compliance_score": { "type": "number" },
+        "referred_by": { "type": "string", "format": "uuid" }
+      },
+      "required": ["id", "email"]
+    },
+    "transactions": {
+      "title": "Financial Transaction",
+      "description": "Records of deposits, commissions, and withdrawals",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "user_id": { "$ref": "users" },
+        "amount": { "type": "number" },
+        "type": { "type": "string" },
+        "status": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "referrals": {
+      "title": "MLM Referral",
+      "description": "Link between referrer and referred user",
+      "type": "object",
+      "properties": {
+        "referrer_id": { "$ref": "users" },
+        "referred_id": { "$ref": "users" }
+      }
+    }
+  },
+  "database": {
+    "public.users": { "schema": "users", "description": "Core users" },
+    "public.transactions": { "schema": "transactions", "description": "Finances" },
+    "public.tasks": { "schema": "tasks", "description": "Global tasks" },
+    "public.user_tasks": { "schema": "user_tasks", "description": "User completion" },
+    "public.settings": { "schema": "settings", "description": "App config" },
+    "public.plans": { "schema": "plans", "description": "Pricing plans" },
+    "public.features": { "schema": "features", "description": "Feature toggles" },
+    "public.tickets": { "schema": "tickets", "description": "Support tickets" },
+    "public.notifications": { "schema": "notifications", "description": "User alerts" }
+  }
+}
