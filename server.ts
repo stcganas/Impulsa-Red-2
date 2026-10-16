@@ -132,7 +132,6 @@ async function startServer() {
     app.use((req, res, next) => {
       if (req.url.includes('upload-image') || req.url.includes('reset-progress')) {
         console.log(`[DEBUG API] Request: ${req.method} ${req.url}`);
-        console.log(`[DEBUG API] Headers: ${JSON.stringify(req.headers)}`);
       }
       console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
       next();
@@ -765,7 +764,7 @@ if (process.env.NODE_ENV !== 'production') {
 
     app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
       console.error('Unhandled error:', err);
-      res.status(500).json({ error: 'Internal server error', details: err.message });
+      res.status(500).json({ error: 'Internal server error' });
     });
 
     console.log(`[SERVER] Preparado para escuchar en puerto ${PORT}`);

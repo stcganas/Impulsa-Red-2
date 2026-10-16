@@ -62,17 +62,21 @@ DECLARE
   v_total_wallet_purchases numeric;
   v_available_balance numeric;
   v_tx_id uuid;
-  v_jwt_role text;
-  v_auth_uid uuid;
+  v_jwt_role text := current_setting('request.jwt.claim.role', true);
+  v_auth_uid uuid := auth.uid();
 BEGIN
-  -- Strict Authorization Check against Supabase JWT context
-  v_jwt_role := current_setting('request.jwt.claim.role', true);
-  v_auth_uid := auth.uid();
-
+  -- 0. Strict Authorization Check (Executed BEFORE any data access or row locking)
   IF v_jwt_role = 'authenticated' AND (v_auth_uid IS NULL OR v_auth_uid IS DISTINCT FROM p_user_id) THEN
     RETURN jsonb_build_object(
       'success', false, 
-      'error', 'Acceso denegado: la identidad autenticada no coincide con el usuario solicitado'
+      'error', 'Acceso denegado: no autorizado para operar sobre otra cuenta'
+    );
+  END IF;
+
+  IF v_jwt_role IS DISTINCT FROM 'authenticated' AND v_jwt_role IS DISTINCT FROM 'service_role' THEN
+    RETURN jsonb_build_object(
+      'success', false, 
+      'error', 'Acceso denegado: rol de solicitud no reconocido o no autorizado'
     );
   END IF;
 
@@ -167,17 +171,21 @@ DECLARE
   v_total_wallet_purchases numeric;
   v_available_balance numeric;
   v_tx_id uuid;
-  v_jwt_role text;
-  v_auth_uid uuid;
+  v_jwt_role text := current_setting('request.jwt.claim.role', true);
+  v_auth_uid uuid := auth.uid();
 BEGIN
-  -- Strict Authorization Check against Supabase JWT context
-  v_jwt_role := current_setting('request.jwt.claim.role', true);
-  v_auth_uid := auth.uid();
-
+  -- 0. Strict Authorization Check (Executed BEFORE any data access or row locking)
   IF v_jwt_role = 'authenticated' AND (v_auth_uid IS NULL OR v_auth_uid IS DISTINCT FROM p_user_id) THEN
     RETURN jsonb_build_object(
       'success', false, 
-      'error', 'Acceso denegado: la identidad autenticada no coincide con el usuario solicitado'
+      'error', 'Acceso denegado: no autorizado para operar sobre otra cuenta'
+    );
+  END IF;
+
+  IF v_jwt_role IS DISTINCT FROM 'authenticated' AND v_jwt_role IS DISTINCT FROM 'service_role' THEN
+    RETURN jsonb_build_object(
+      'success', false, 
+      'error', 'Acceso denegado: rol de solicitud no reconocido o no autorizado'
     );
   END IF;
 

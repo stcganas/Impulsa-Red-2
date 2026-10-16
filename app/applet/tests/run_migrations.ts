@@ -1,12 +1,14 @@
 /**
- * IMPULSARED - CONTROLLED MIGRATION RUNNER (DRY-RUN / STATIC VALIDATION)
+ * IMPULSARED - REAL CONTROLLED MIGRATION RUNNER
  * 
- * Validates migration file existence and connection string safety via db_guard.
- * Does NOT execute actual database writes or DDL statements in dry-run mode.
+ * Validates connection string safety via db_guard, connects using 'pg' client,
+ * executes migrations 01 to 06 sequentially within transactions, and stops on error.
  */
 
 import fs from 'fs';
 import path from 'path';
+import pkg from 'pg';
+const { Client } = pkg;
 import { verifyDisposableLocalDb } from './db_guard.ts';
 
 const MIGRATION_FILES = [
@@ -19,17 +21,38 @@ const MIGRATION_FILES = [
 ];
 
 export async function runMigrations(connectionString: string) {
+  // 1. Guard check before opening any connection
   verifyDisposableLocalDb(connectionString);
-  console.log('--- STARTING CONTROLLED MIGRATION DRY-RUN / STATIC VALIDATION ---');
   
-  for (const file of MIGRATION_FILES) {
-    const filePath = path.resolve(process.cwd(), file);
-    if (!fs.existsSync(filePath)) {
-      throw new Error(`Migration file not found: ${file}`);
+  console.log('--- STARTING REAL CONTROLLED MIGRATION EXECUTION ---');
+  
+  const client = new Client({ connectionString });
+  
+  try {
+    await client.connect();
+    console.log('[MIGRATION] Connected successfully to disposable local PostgreSQL database.');
+
+    for (const file of MIGRATION_FILES) {
+      const filePath = path.resolve(process.cwd(), file);
+      if (!fs.existsSync(filePath)) {
+        throw new Error(`Migration file not found: ${file}`);
+      }
+      
+      const sqlContent = fs.readFileSync(filePath, 'utf8');
+      console.log(`[MIGRATION] Executing: ${file} ...`);
+      
+      // Execute migration SQL
+      await client.query(sqlContent);
+      
+      console.log(`[MIGRATION] ✅ CONFIRMED SUCCESS: ${file}`);
     }
-    const stat = fs.statSync(filePath);
-    console.log(`[DRY-RUN MIGRATION] Verified file: ${file} (${stat.size} bytes)`);
+    
+    console.log('--- ALL MIGRATIONS EXECUTED AND CONFIRMED SUCCESSFULLY ---');
+  } catch (err: any) {
+    console.error(`[MIGRATION ERROR] Migration sequence halted due to error: ${err.message}`);
+    throw err;
+  } finally {
+    await client.end();
+    console.log('[MIGRATION] Database connection closed.');
   }
-  
-  console.log('--- ALL MIGRATION FILES VALIDATED SUCCESSFULLY (DRY-RUN ONLY: NO SQL EXECUTED) ---');
 }
