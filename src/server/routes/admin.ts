@@ -335,21 +335,8 @@ export function adminRoutes(services: any) {
   });
 
   // Admin Transactions
-  router.get('/transactions', authenticate, async (req: any, res: any) => {
+  router.get('/transactions', authenticate, authorizeAdmin, async (req: any, res: any) => {
     try {
-
-
-
-
-
-
-
-    const adminUser = req.user;
-
-      // Check if admin
-      const { data: adminProfile } = await supabase.from('users').select('role').eq('id', adminUser.id).single();
-      if (adminProfile?.role !== 'admin') return res.status(403).json({ error: 'No autorizado' });
-
       const { data, error } = await supabase
         .from('transactions')
         .select(`
@@ -429,23 +416,8 @@ export function adminRoutes(services: any) {
 
 
   // Tickets - List All (Admin)
-  router.get('/tickets', authenticate, async (req: any, res: any) => {
+  router.get('/tickets', authenticate, authorizeAdmin, async (req: any, res: any) => {
     try {
-
-
-
-
-
-
-    const user = req.user;
-
-      const { data: profile, error: profileError } = await supabase.from('users').select('role').eq('id', user.id).single();
-      
-      if (profileError || profile?.role !== 'admin') {
-        console.warn('Unauthorized admin access attempt:', user.id, profileError);
-        return res.status(403).json({ error: 'Forbidden' });
-      }
-
       const { data, error } = await supabase
         .from('tickets')
         .select('*, user:user_id(name, email)')
@@ -557,11 +529,42 @@ export function adminRoutes(services: any) {
 
 
       const { id } = req.params;
-      const { status, role, name, email, phone, address, wallet_balance, xp } = req.body;
+      const allowedFields = ['status', 'role', 'name', 'email', 'phone', 'address', 'wallet_balance', 'xp'];
+      const updateData: Record<string, any> = {};
+
+      for (const field of allowedFields) {
+        if (req.body[field] !== undefined) {
+          updateData[field] = req.body[field];
+        }
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ error: 'No se enviaron campos válidos para actualizar' });
+      }
+
+      if (updateData.role && !['user', 'admin'].includes(updateData.role)) {
+        return res.status(400).json({ error: 'Rol inválido. Los roles permitidos son "user" o "admin"' });
+      }
+
+      if (updateData.wallet_balance !== undefined) {
+        const balance = Number(updateData.wallet_balance);
+        if (isNaN(balance) || balance < 0) {
+          return res.status(400).json({ error: 'El saldo de la billetera debe ser un número mayor o igual a cero' });
+        }
+        updateData.wallet_balance = balance;
+      }
+
+      if (updateData.xp !== undefined) {
+        const xpVal = Number(updateData.xp);
+        if (isNaN(xpVal) || xpVal < 0) {
+          return res.status(400).json({ error: 'El valor de XP debe ser un número entero mayor o igual a cero' });
+        }
+        updateData.xp = Math.floor(xpVal);
+      }
 
       const { error: updateError } = await supabase
         .from('users')
-        .update({ status, role, name, email, phone, address, wallet_balance, xp })
+        .update(updateData)
         .eq('id', id);
 
       if (updateError) throw updateError;

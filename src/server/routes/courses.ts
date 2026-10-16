@@ -20,7 +20,9 @@ export function coursesRoutes(services: any) {
     const authUser = req.user;
 
       const courseId = req.params.id;
-      const { xpReward } = req.body;
+      // Security: Sanitize and bound xpReward to prevent arbitrary XP injection (max 100 XP per course)
+      const rawXp = Number(req.body.xpReward);
+      const safeXpReward = Math.min(Math.max(!isNaN(rawXp) ? Math.floor(rawXp) : 50, 0), 100);
 
       // 1. Check if already completed
       const { data: existing } = await supabase
@@ -48,7 +50,7 @@ export function coursesRoutes(services: any) {
 
       if (!profile) throw new Error("Perfil no encontrado");
 
-      const newXp = (profile.xp || 0) + (xpReward || 0);
+      const newXp = (profile.xp || 0) + safeXpReward;
       const newLevel = calculateLevelFromXP(newXp);
       const leveledUp = newLevel > (profile.level || 1);
       
@@ -67,7 +69,7 @@ export function coursesRoutes(services: any) {
 
       res.json({ 
         success: true, 
-        xpGained: xpReward, 
+        xpGained: safeXpReward, 
         newXp, 
         newLevel, 
         leveledUp,

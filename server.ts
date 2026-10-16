@@ -28,30 +28,71 @@ import {
 } from './src/server/routes/index.ts';
 import { sendNotification } from './src/server/services/notificationService.ts';
 import { initScheduler } from './src/server/services/schedulerService.ts';
+import { 
+  calculateMultiLevelCommissions, 
+  financialMutex, 
+  getTierMultiplier 
+} from './src/server/services/commissionEngine.ts';
 dotenv.config();
 
 console.log("--- SERVIDOR INICIANDO ---");
 
 const supabaseUrl = (process.env.VITE_SUPABASE_URL || '').trim();
-const supabaseServiceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '').trim();
+const supabaseServiceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+const supabaseAnonKey = (process.env.VITE_SUPABASE_ANON_KEY || '').trim();
 
-console.log("Supabase URL configured:", !!supabaseUrl, supabaseUrl ? `(${supabaseUrl.substring(0, 15)}...)` : "");
-console.log("Supabase Key configured:", !!supabaseServiceKey, supabaseServiceKey ? `(${supabaseServiceKey.substring(0, 10)}...)` : "");
-const isUsingServiceRole = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
-console.log("Is using Service Role Key:", isUsingServiceRole);
+const isUsingServiceRole = !!supabaseServiceRoleKey;
+console.log("Supabase URL configured:", !!supabaseUrl);
+console.log("Supabase Service Role Key configured:", isUsingServiceRole);
+console.log("Supabase Public Anon Key configured:", !!supabaseAnonKey);
 
+let supabaseAdmin: any = null;
+let supabasePublic: any = null;
 let supabase: any = null;
-if (supabaseUrl && supabaseServiceKey) {
+
+if (!supabaseUrl) {
+  console.warn("ADVERTENCIA CRÍTICA: VITE_SUPABASE_URL no está configurada.");
+}
+
+// 1. Privileged server client (Requires SUPABASE_SERVICE_ROLE_KEY, NO silent fallback to anon key)
+if (supabaseUrl && supabaseServiceRoleKey) {
   try {
-    supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
       auth: {
         persistSession: false,
         autoRefreshToken: false,
         detectSessionInUrl: false
       }
     });
-    console.log("Supabase inicializado correctamente (Session persistence disabled)");
-    
+    console.log("Cliente administrativo Supabase (service_role) inicializado de forma segura.");
+  } catch (err) {
+    console.error("Error al inicializar cliente administrativo de Supabase:", err);
+  }
+} else {
+  console.warn("ALERTA DE SEGURIDAD: SUPABASE_SERVICE_ROLE_KEY no configurada. Las operaciones financieras y de administración requerirán credencial privilegiada y serán rechazadas de forma segura.");
+}
+
+// 2. Public client (for public non-privileged reads with anon key)
+if (supabaseUrl && supabaseAnonKey) {
+  try {
+    supabasePublic = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false
+      }
+    });
+    console.log("Cliente público Supabase (anon_key) inicializado.");
+  } catch (err) {
+    console.error("Error al inicializar cliente público de Supabase:", err);
+  }
+}
+
+// Primary client for general operations: prefer admin if configured, else public
+supabase = supabaseAdmin || supabasePublic;
+
+if (supabase) {
+  try {
     // Ensure storage buckets exist
     const buckets = ['app-assets', 'avatars', 'receipts'];
     buckets.forEach(bucketName => {
@@ -72,376 +113,10 @@ if (supabaseUrl && supabaseServiceKey) {
         });
     });
 
-    // Add receipt_url column if not exists
-    supabase.rpc('exec_sql', { sql: 'ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS receipt_url text;' })
-      .then(({ error }: any) => {
-        if (error) console.warn("Could not add receipt_url column via RPC.");
-        else console.log("receipt_url column check completed");
-      })
-      .catch((err: any) => {
-        console.error("Unhandled error in exec_sql RPC:", err);
-      });
-
-    // Add task-related and invitation columns to users table
-    const addTaskColumnsSql = `
-      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS is_tasks_active boolean DEFAULT false;
-      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS task_start_date timestamp with time zone;
-      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS task_end_date timestamp with time zone;
-      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS wallet_balance numeric DEFAULT 0;
-      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS inventory_status text DEFAULT 'Inactivo';
-      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS compliance_score integer DEFAULT 100;
-      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS username text;
-      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS photo_url text;
-      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS invite_title text;
-      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS invite_message text;
-      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS invite_banner text;
-      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS invite_whatsapp_message text;
-      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS last_reset_at timestamp with time zone;
-      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS push_token text;
-      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS birth_date date;
-      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS neighborhood text;
-      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS nequi_number text;
-      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS document_url text;
-      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS document_back_url text;
-      
-      -- Phase 3: Gamification & Retention Columns
-      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS current_streak integer DEFAULT 0;
-      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS longest_streak integer DEFAULT 0;
-      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS last_task_date timestamp with time zone;
-      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS badges jsonb DEFAULT '[]'::jsonb;
-      
-      CREATE TABLE IF NOT EXISTS public.events (
-        id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-        user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
-        event_type text NOT NULL,
-        value numeric DEFAULT 1,
-        metadata jsonb DEFAULT '{}'::jsonb,
-        created_at timestamp with time zone DEFAULT now()
-      );
-
-      CREATE TABLE IF NOT EXISTS public.conversion_events (
-        id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-        referral_code text,
-        event_type text NOT NULL,
-        metadata jsonb DEFAULT '{}'::jsonb,
-        created_at timestamp with time zone DEFAULT now()
-      );
-      ALTER TABLE public.conversion_events ENABLE ROW LEVEL SECURITY;
-      DROP POLICY IF EXISTS "Enable all access for conversion_events" ON public.conversion_events;
-      CREATE POLICY "Enable all access for conversion_events" ON public.conversion_events FOR ALL USING (true) WITH CHECK (true);
-
-      CREATE TABLE IF NOT EXISTS public.tasks (
-        id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-        name text,
-        day text DEFAULT '1',
-        xp integer DEFAULT 0,
-        type text DEFAULT 'daily',
-        created_at timestamp with time zone DEFAULT now()
-      );
-
-      ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS title text;
-      ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS description text;
-      ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS conditions jsonb DEFAULT '{}'::jsonb;
-      ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS xp_reward integer DEFAULT 0;
-      ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS is_active boolean DEFAULT true;
-
-      -- Migrate existing tasks data if needed
-      UPDATE public.tasks SET title = name WHERE title IS NULL AND name IS NOT NULL;
-      UPDATE public.tasks SET xp_reward = xp WHERE xp_reward = 0 AND xp IS NOT NULL;
-
-      CREATE TABLE IF NOT EXISTS public.user_tasks (
-        id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-        user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
-        task_id uuid REFERENCES public.tasks(id) ON DELETE CASCADE,
-        progress numeric DEFAULT 0,
-        required numeric DEFAULT 1,
-        completed boolean DEFAULT false,
-        ready_to_claim boolean DEFAULT false,
-        completed_at timestamp with time zone,
-        UNIQUE(user_id, task_id)
-      );
-
-      ALTER TABLE public.user_tasks ADD COLUMN IF NOT EXISTS progress numeric DEFAULT 0;
-      ALTER TABLE public.user_tasks ADD COLUMN IF NOT EXISTS required numeric DEFAULT 1;
-      ALTER TABLE public.user_tasks ADD COLUMN IF NOT EXISTS completed boolean DEFAULT false;
-      ALTER TABLE public.user_tasks ADD COLUMN IF NOT EXISTS ready_to_claim boolean DEFAULT false;
-      ALTER TABLE public.user_tasks ADD COLUMN IF NOT EXISTS completed_at timestamp with time zone;
-      ALTER TABLE public.user_tasks ADD COLUMN IF NOT EXISTS reward_claimed boolean DEFAULT false;
-      ALTER TABLE public.user_tasks ADD COLUMN IF NOT EXISTS status text DEFAULT 'active';
-      
-      CREATE TABLE IF NOT EXISTS public.task_submissions (
-        id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-        user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
-        task_id uuid REFERENCES public.tasks(id) ON DELETE CASCADE,
-        evidence_url text,
-        notes text,
-        status text DEFAULT 'pending',
-        reviewed_at timestamp with time zone,
-        reviewed_by uuid REFERENCES auth.users(id),
-        rejection_reason text,
-        created_at timestamp with time zone DEFAULT now()
-      );
-
-      ALTER TABLE public.user_tasks ADD COLUMN IF NOT EXISTS submission_id uuid REFERENCES public.task_submissions(id) ON DELETE SET NULL;
-      
-      -- Feature System Tables
-      CREATE TABLE IF NOT EXISTS public.plans (
-        id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-        name text NOT NULL,
-        price numeric NOT NULL DEFAULT 0,
-        level integer NOT NULL DEFAULT 1,
-        description text,
-        created_at timestamptz DEFAULT now()
-      );
-
-      -- Scheduled Notifications Table
-      CREATE TABLE IF NOT EXISTS public.scheduled_notifications (
-        id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-        user_id uuid REFERENCES public.users(id) ON DELETE CASCADE,
-        target_role text,
-        title text NOT NULL,
-        message text NOT NULL,
-        type text DEFAULT 'info',
-        scheduled_at timestamp with time zone NOT NULL,
-        status text DEFAULT 'pending',
-        created_at timestamp with time zone DEFAULT now()
-      );
-      ALTER TABLE public.scheduled_notifications ENABLE ROW LEVEL SECURITY;
-      DROP POLICY IF EXISTS "Enable all access for scheduled_notifications" ON public.scheduled_notifications;
-      CREATE POLICY "Enable all access for scheduled_notifications" ON public.scheduled_notifications FOR ALL USING (true) WITH CHECK (true);
-
-      CREATE TABLE IF NOT EXISTS public.notifications (
-        id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-        user_id uuid REFERENCES public.users(id) ON DELETE CASCADE,
-        title text NOT NULL,
-        message text NOT NULL,
-        type text DEFAULT 'info',
-        read boolean DEFAULT false,
-        created_at timestamp with time zone DEFAULT now()
-      );
-      ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
-      DROP POLICY IF EXISTS "Enable all access for notifications" ON public.notifications;
-      CREATE POLICY "Enable all access for notifications" ON public.notifications FOR ALL USING (true) WITH CHECK (true);
-
-
-      CREATE TABLE IF NOT EXISTS public.features (
-        id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-        key text NOT NULL UNIQUE,
-        name text NOT NULL,
-        description text,
-        default_value jsonb NOT NULL,
-        created_at timestamptz DEFAULT now()
-      );
-
-      CREATE TABLE IF NOT EXISTS public.plan_features (
-        id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-        plan_id uuid REFERENCES public.plans(id) ON DELETE CASCADE,
-        feature_id uuid REFERENCES public.features(id) ON DELETE CASCADE,
-        value jsonb NOT NULL,
-        UNIQUE(plan_id, feature_id)
-      );
-
-      ALTER TABLE public.users ADD COLUMN IF NOT EXISTS plan_id uuid REFERENCES public.plans(id);
-      
-      -- Seed Default Plans
-      INSERT INTO public.plans (id, name, price, level, description)
-      VALUES 
-        ('00000000-0000-0000-0000-000000000000', 'Básico', 15000, 1, 'Plan ideal para empezar a construir tu red.'),
-        ('11111111-1111-1111-1111-111111111111', 'Avanzado', 30000, 2, 'Para usuarios que buscan mayor rentabilidad y herramientas.'),
-        ('22222222-2222-2222-2222-222222222222', 'Pro', 60000, 3, 'El equilibrio perfecto entre inversión y beneficios exponenciales.'),
-        ('33333333-3333-3333-3333-333333333333', 'Élite', 120000, 4, 'Máxima rentabilidad, soporte VIP y acceso total a la plataforma.')
-      ON CONFLICT (id) DO UPDATE SET 
-        name = EXCLUDED.name, 
-        price = EXCLUDED.price, 
-        description = EXCLUDED.description;
-
-      -- Assign default plan to users without one
-      UPDATE public.users SET plan_id = '00000000-0000-0000-0000-000000000000' WHERE plan_id IS NULL;
-
-      -- Seed Default Features
-      INSERT INTO public.features (key, name, description, default_value)
-      VALUES 
-        ('commission_level_1', 'Comisión Nivel 1', 'Porcentaje de comisión por referidos directos', '0.05'),
-        ('commission_increment', 'Incremento por Nivel', 'Aumento de comisión por cada nivel subido', '0.0065'),
-        ('max_referrals', 'Máximo de Referidos', 'Número máximo de personas que puedes referir', '1000000'),
-        ('support_type', 'Tipo de Soporte', 'Nivel de atención al cliente', '"Estándar"'),
-        ('marketing_material', 'Material de Marketing', 'Acceso a recursos para promocionar', '"Básico"'),
-        ('mentorship', 'Mentorías', 'Acceso a sesiones de mentoría', '"No"'),
-        ('automation_tools', 'Herramientas de Automatización', 'Uso de bots y herramientas automáticas', '"No"'),
-        ('vip_events', 'Eventos VIP', 'Acceso a eventos presenciales exclusivos', '"No"')
-      ON CONFLICT (key) DO UPDATE SET
-        name = EXCLUDED.name,
-        description = EXCLUDED.description;
-
-      -- Seed Plan Features (We need to link them, but since we don't know the feature IDs easily in raw SQL without a DO block, we can do it via a quick script or just leave the features to be configured via the admin panel. Let's use a DO block to seed plan features)
-      DO $$
-      DECLARE
-        f_comm1 uuid; f_inc uuid; f_supp uuid; f_mkt uuid; f_ment uuid; f_auto uuid; f_vip uuid;
-      BEGIN
-        SELECT id INTO f_comm1 FROM public.features WHERE key = 'commission_level_1';
-        SELECT id INTO f_inc FROM public.features WHERE key = 'commission_increment';
-        SELECT id INTO f_supp FROM public.features WHERE key = 'support_type';
-        SELECT id INTO f_mkt FROM public.features WHERE key = 'marketing_material';
-        SELECT id INTO f_ment FROM public.features WHERE key = 'mentorship';
-        SELECT id INTO f_auto FROM public.features WHERE key = 'automation_tools';
-        SELECT id INTO f_vip FROM public.features WHERE key = 'vip_events';
-
-        -- Básico
-        INSERT INTO public.plan_features (plan_id, feature_id, value) VALUES ('00000000-0000-0000-0000-000000000000', f_comm1, '"0.05"') ON CONFLICT (plan_id, feature_id) DO UPDATE SET value = EXCLUDED.value;
-        INSERT INTO public.plan_features (plan_id, feature_id, value) VALUES ('00000000-0000-0000-0000-000000000000', f_inc, '"0.0065"') ON CONFLICT (plan_id, feature_id) DO UPDATE SET value = EXCLUDED.value;
-        INSERT INTO public.plan_features (plan_id, feature_id, value) VALUES ('00000000-0000-0000-0000-000000000000', f_supp, '"Estándar"') ON CONFLICT (plan_id, feature_id) DO UPDATE SET value = EXCLUDED.value;
-        INSERT INTO public.plan_features (plan_id, feature_id, value) VALUES ('00000000-0000-0000-0000-000000000000', f_mkt, '"Básico"') ON CONFLICT (plan_id, feature_id) DO UPDATE SET value = EXCLUDED.value;
-
-        -- Avanzado
-        INSERT INTO public.plan_features (plan_id, feature_id, value) VALUES ('11111111-1111-1111-1111-111111111111', f_comm1, '"0.10"') ON CONFLICT (plan_id, feature_id) DO UPDATE SET value = EXCLUDED.value;
-        INSERT INTO public.plan_features (plan_id, feature_id, value) VALUES ('11111111-1111-1111-1111-111111111111', f_inc, '"0.0060"') ON CONFLICT (plan_id, feature_id) DO UPDATE SET value = EXCLUDED.value;
-        INSERT INTO public.plan_features (plan_id, feature_id, value) VALUES ('11111111-1111-1111-1111-111111111111', f_supp, '"Prioritario"') ON CONFLICT (plan_id, feature_id) DO UPDATE SET value = EXCLUDED.value;
-        INSERT INTO public.plan_features (plan_id, feature_id, value) VALUES ('11111111-1111-1111-1111-111111111111', f_mkt, '"Avanzado"') ON CONFLICT (plan_id, feature_id) DO UPDATE SET value = EXCLUDED.value;
-
-        -- Pro
-        INSERT INTO public.plan_features (plan_id, feature_id, value) VALUES ('22222222-2222-2222-2222-222222222222', f_comm1, '"0.20"') ON CONFLICT (plan_id, feature_id) DO UPDATE SET value = EXCLUDED.value;
-        INSERT INTO public.plan_features (plan_id, feature_id, value) VALUES ('22222222-2222-2222-2222-222222222222', f_inc, '"0.0050"') ON CONFLICT (plan_id, feature_id) DO UPDATE SET value = EXCLUDED.value;
-        INSERT INTO public.plan_features (plan_id, feature_id, value) VALUES ('22222222-2222-2222-2222-222222222222', f_supp, '"Prioritario"') ON CONFLICT (plan_id, feature_id) DO UPDATE SET value = EXCLUDED.value;
-        INSERT INTO public.plan_features (plan_id, feature_id, value) VALUES ('22222222-2222-2222-2222-222222222222', f_ment, '"Grupales"') ON CONFLICT (plan_id, feature_id) DO UPDATE SET value = EXCLUDED.value;
-        INSERT INTO public.plan_features (plan_id, feature_id, value) VALUES ('22222222-2222-2222-2222-222222222222', f_auto, '"Sí"') ON CONFLICT (plan_id, feature_id) DO UPDATE SET value = EXCLUDED.value;
-
-        -- Élite
-        INSERT INTO public.plan_features (plan_id, feature_id, value) VALUES ('33333333-3333-3333-3333-333333333333', f_comm1, '"0.30"') ON CONFLICT (plan_id, feature_id) DO UPDATE SET value = EXCLUDED.value;
-        INSERT INTO public.plan_features (plan_id, feature_id, value) VALUES ('33333333-3333-3333-3333-333333333333', f_inc, '"0.0040"') ON CONFLICT (plan_id, feature_id) DO UPDATE SET value = EXCLUDED.value;
-        INSERT INTO public.plan_features (plan_id, feature_id, value) VALUES ('33333333-3333-3333-3333-333333333333', f_supp, '"VIP 24/7"') ON CONFLICT (plan_id, feature_id) DO UPDATE SET value = EXCLUDED.value;
-        INSERT INTO public.plan_features (plan_id, feature_id, value) VALUES ('33333333-3333-3333-3333-333333333333', f_ment, '"1 a 1"') ON CONFLICT (plan_id, feature_id) DO UPDATE SET value = EXCLUDED.value;
-        INSERT INTO public.plan_features (plan_id, feature_id, value) VALUES ('33333333-3333-3333-3333-333333333333', f_auto, '"Sí Avanzado"') ON CONFLICT (plan_id, feature_id) DO UPDATE SET value = EXCLUDED.value;
-        INSERT INTO public.plan_features (plan_id, feature_id, value) VALUES ('33333333-3333-3333-3333-333333333333', f_vip, '"Sí"') ON CONFLICT (plan_id, feature_id) DO UPDATE SET value = EXCLUDED.value;
-      END $$;
-      
-      ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS type text DEFAULT 'daily';
-      ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS day text DEFAULT '1';
-      ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS requires_evidence boolean DEFAULT true;
-
-      CREATE TABLE IF NOT EXISTS public.settings (
-        id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-        key text NOT NULL UNIQUE,
-        value jsonb NOT NULL,
-        created_at timestamptz DEFAULT now()
-      );
-
-      -- Seed Default Settings
-      INSERT INTO public.settings (key, value)
-      VALUES 
-        ('app_name', '"ImpulsaRed"'),
-        ('app_logo', 'null'),
-        ('maintenance_mode', 'false'),
-        ('min_withdrawal', '50'),
-        ('max_withdrawal', '1000'),
-        ('withdrawal_fee', '5')
-      ON CONFLICT (key) DO NOTHING;
-
-      CREATE TABLE IF NOT EXISTS public.penalty_tasks (
-        id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-        user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
-        name text NOT NULL,
-        xp integer DEFAULT 0,
-        is_completed boolean DEFAULT false,
-        original_task_id uuid REFERENCES public.tasks(id) ON DELETE SET NULL,
-        created_at timestamp with time zone DEFAULT now()
-      );
-
-      CREATE TABLE IF NOT EXISTS public.invite_clicks (
-        id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-        referral_code text NOT NULL,
-        ip text,
-        device text,
-        user_agent text,
-        created_at timestamp with time zone DEFAULT now()
-      );
-
-      -- Settings RLS Policies
-      ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
-
-      DROP POLICY IF EXISTS "Public read access to settings" ON public.settings;
-      CREATE POLICY "Public read access to settings" ON public.settings
-        FOR SELECT USING (true);
-
-      DROP POLICY IF EXISTS "Admin write access to settings" ON public.settings;
-      CREATE POLICY "Admin write access to settings" ON public.settings
-        FOR ALL
-        TO authenticated
-        USING (
-          EXISTS (
-            SELECT 1 FROM public.users
-            WHERE users.id = auth.uid() AND users.role = 'admin'
-          )
-        );
-
-      -- Storage RLS Policies
-      ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
-
-      DROP POLICY IF EXISTS "Public Access to app-assets" ON storage.objects;
-      CREATE POLICY "Public Access to app-assets" ON storage.objects
-        FOR SELECT
-        USING (bucket_id = 'app-assets');
-
-      DROP POLICY IF EXISTS "Authenticated users can upload to app-assets" ON storage.objects;
-      CREATE POLICY "Authenticated users can upload to app-assets" ON storage.objects
-        FOR INSERT
-        TO authenticated
-        WITH CHECK (bucket_id = 'app-assets');
-
-      DROP POLICY IF EXISTS "Authenticated users can update their uploads in app-assets" ON storage.objects;
-      CREATE POLICY "Authenticated users can update their uploads in app-assets" ON storage.objects
-        FOR UPDATE
-        TO authenticated
-        USING (bucket_id = 'app-assets' AND owner = auth.uid());
-
-      DROP POLICY IF EXISTS "Authenticated users can delete their uploads in app-assets" ON storage.objects;
-      CREATE POLICY "Authenticated users can delete their uploads in app-assets" ON storage.objects
-        FOR DELETE
-        TO authenticated
-        USING (bucket_id = 'app-assets' AND owner = auth.uid());
-
-      -- Avatars Bucket Policies
-      DROP POLICY IF EXISTS "Public Access to avatars" ON storage.objects;
-      CREATE POLICY "Public Access to avatars" ON storage.objects
-        FOR SELECT
-        USING (bucket_id = 'avatars');
-
-      DROP POLICY IF EXISTS "Authenticated users can upload to avatars" ON storage.objects;
-      CREATE POLICY "Authenticated users can upload to avatars" ON storage.objects
-        FOR INSERT
-        TO authenticated
-        WITH CHECK (bucket_id = 'avatars');
-
-      DROP POLICY IF EXISTS "Authenticated users can update their uploads in avatars" ON storage.objects;
-      CREATE POLICY "Authenticated users can update their uploads in avatars" ON storage.objects
-        FOR UPDATE
-        TO authenticated
-        USING (bucket_id = 'avatars'); -- Note: allowed update for any authenticated for simplicity in this dev phase
-
-      -- Receipts Bucket Policies
-      DROP POLICY IF EXISTS "Public Access to receipts" ON storage.objects;
-      CREATE POLICY "Public Access to receipts" ON storage.objects
-        FOR SELECT
-        USING (bucket_id = 'receipts');
-
-      DROP POLICY IF EXISTS "Authenticated users can upload to receipts" ON storage.objects;
-      CREATE POLICY "Authenticated users can upload to receipts" ON storage.objects
-        FOR INSERT
-        TO authenticated
-        WITH CHECK (bucket_id = 'receipts');
-    `;
-    supabase.rpc('exec_sql', { sql: addTaskColumnsSql })
-      .then(({ error }: any) => {
-        if (error) console.warn("Could not add task columns via RPC.", error);
-        else console.log("Database schema and storage RLS policies updated successfully.");
-      })
-      .catch((err: any) => {
-        console.error("Unhandled error in addTaskColumnsSql RPC:", err);
-      });
+    console.log("Supabase storage buckets verified. Schema migrations are managed via versioned SQL scripts.");
   } catch (err) {
-    console.error("Error al inicializar Supabase:", err);
+    console.error("Error al verificar storage de Supabase:", err);
   }
-} else {
-  console.warn("ADVERTENCIA: Faltan llaves de Supabase. Algunas funciones no estarán disponibles.");
 }
 
 async function startServer() {
@@ -712,31 +387,43 @@ async function startServer() {
 
   
 
-  // Helper to update user wallet balance
-  async function updateWalletBalance(userId: string) {
+  // Helper to update user wallet balance under concurrency mutex lock
+  async function updateWalletBalance(userId: string): Promise<number> {
+    if (!userId) return 0;
+    const releaseUserLock = await financialMutex.acquire(`wallet_user_${userId}`);
     try {
-      const { data: txs, error: txError } = await supabase
+      const client = supabaseAdmin || supabase;
+      if (!client) {
+        console.warn(`[WALLET] Supabase client not available to update balance for user ${userId}`);
+        return 0;
+      }
+
+      const { data: txs, error: txError } = await client
         .from('transactions')
-        .select('amount, type, status')
+        .select('amount, type, status, receipt_url')
         .eq('user_id', userId);
 
       if (txError) throw txError;
 
+      // 1. Total earnings from completed referral commissions
       const totalEarnings = (txs || [])
         .filter((t: any) => t.type === 'referral_commission' && t.status === 'completed')
-        .reduce((acc: number, curr: any) => acc + Number(curr.amount), 0);
+        .reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0);
 
+      // 2. Total committed withdrawals (pending reservation + completed; rejected are excluded/released)
       const totalWithdrawals = (txs || [])
         .filter((t: any) => t.type === 'withdrawal' && t.status !== 'rejected')
-        .reduce((acc: number, curr: any) => acc + Number(curr.amount), 0);
+        .reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0);
 
+      // 3. Total plan purchases paid with wallet balance
       const totalWalletPurchases = (txs || [])
         .filter((t: any) => t.type === 'plan_purchase' && t.status === 'completed' && t.receipt_url === 'wallet')
-        .reduce((acc: number, curr: any) => acc + Number(curr.amount), 0);
+        .reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0);
 
-      const balance = totalEarnings - totalWithdrawals - totalWalletPurchases;
+      const balance = Math.max(0, Math.floor(totalEarnings - totalWithdrawals - totalWalletPurchases));
 
-      await supabase
+      // Persist balance in users table
+      await client
         .from('users')
         .update({ wallet_balance: balance })
         .eq('id', userId);
@@ -745,155 +432,213 @@ async function startServer() {
     } catch (err) {
       console.error(`Error updating wallet balance for user ${userId}:`, err);
       return 0;
+    } finally {
+      releaseUserLock();
     }
   }
 
-  
-// Define helper function to process a plan purchase specifically (used by wallet payments and admin approval)
+  // Define helper function to process a plan purchase with atomicity, idempotency, and 70% commission cap
   async function processPlanPurchase(tx: any) {
-    if (!tx || tx.type !== 'plan_purchase') return;
+    if (!tx || tx.type !== 'plan_purchase') return { success: false, reason: 'Invalid transaction' };
 
-    // 0. Get user's current level
-    const { data: userProfile } = await supabase.from('users').select('level').eq('id', tx.user_id).single();
-    const userLevel = userProfile?.level || 1;
-
-    // 1. Identify plan from amount or metadata
-    const amount = Math.abs(tx.amount);
-    let planName = 'Básico';
-    let planId = null;
-    
-    // Try to find plan in database by amount
-    const { data: planData } = await supabase
-      .from('plans')
-      .select('id, name')
-      .eq('price', amount)
-      .single();
-
-    if (planData) {
-      planName = planData.name;
-      planId = planData.id;
-    } else {
-      // Fallback to hardcoded logic if plan not found in table
-      if (amount >= 120000) { planName = 'Élite'; }
-      else if (amount >= 60000) { planName = 'Pro'; }
-      else if (amount >= 30000) { planName = 'Avanzado'; }
+    const client = supabaseAdmin || supabase;
+    if (!client) {
+      throw new Error('Supabase client unavailable');
     }
 
-    const newPercentage = calculatePercentage(userLevel, planName);
+    // Acquire lock for this specific purchase transaction to prevent concurrent duplicate accreditation
+    const releaseTxLock = await financialMutex.acquire(`purchase_tx_${tx.id}`);
+    try {
+      // 1. Idempotency Check: check if referral commissions for this purchase_tx already exist
+      const { data: existingCommissions } = await client
+        .from('transactions')
+        .select('id')
+        .eq('type', 'referral_commission')
+        .or(`receipt_url.eq.commission_for_${tx.id},purchase_tx_id.eq.${tx.id}`);
 
-    // 2. Update user plan
-    const updateData: any = {
-      plan: planName,
-      percentage: newPercentage
-    };
-    if (planId) {
-      updateData.plan_id = planId;
-    }
+      if (existingCommissions && existingCommissions.length > 0) {
+        console.log(`[IDEMPOTENCY] Purchase transaction ${tx.id} already processed commissions (${existingCommissions.length} found). Skipping.`);
+        return { success: true, alreadyProcessed: true };
+      }
 
-    const { error: userUpdateError } = await supabase
-      .from('users')
-      .update(updateData)
-      .eq('id', tx.user_id);
-
-    if (userUpdateError) throw userUpdateError;
-
-    // 3. Process referral commission (Up to 3 levels)
-    let currentReferredId = tx.user_id;
-    let currentLevel = 1;
-    
-    while (currentLevel <= 3) {
-      const { data: referral } = await supabase
-        .from('referrals')
-        .select('referrer_id')
-        .eq('referred_id', currentReferredId)
+      // Fetch fresh transaction row
+      const { data: currentTx, error: txFetchError } = await client
+        .from('transactions')
+        .select('*')
+        .eq('id', tx.id)
         .single();
 
-      if (!referral || !referral.referrer_id) break;
+      if (txFetchError || !currentTx) {
+        throw new Error(`Purchase transaction ${tx.id} not found`);
+      }
 
-      const { data: referrer } = await supabase
+      // 2. Identify plan from amount or metadata
+      const amount = Math.abs(Number(currentTx.amount) || 0);
+      let planName = 'Básico';
+      let planId = null;
+
+      const { data: planData } = await client
+        .from('plans')
+        .select('id, name')
+        .eq('price', amount)
+        .single();
+
+      if (planData) {
+        planName = planData.name;
+        planId = planData.id;
+      } else {
+        if (amount >= 120000) { planName = 'Élite'; }
+        else if (amount >= 60000) { planName = 'Pro'; }
+        else if (amount >= 30000) { planName = 'Avanzado'; }
+      }
+
+      // 3. Update user's plan and percentage
+      const { data: userProfile } = await client
         .from('users')
-        .select('percentage, name, plan')
-        .eq('id', referral.referrer_id)
+        .select('level')
+        .eq('id', currentTx.user_id)
         .single();
 
-      if (referrer) {
-        // Calculate percentage based on level and plan
-        let levelPercentage = 0;
-        const planLower = referrer.plan?.toLowerCase() || 'básico';
-        
-        if (currentLevel === 1) {
-          levelPercentage = 100; // 100% of their base commission
-        } else if (currentLevel === 2) {
-          if (planLower.includes('elite') || planLower.includes('élite')) levelPercentage = 50;
-          else if (planLower.includes('pro')) levelPercentage = 40;
-          else if (planLower.includes('avanzado')) levelPercentage = 30;
-          else levelPercentage = 20; // Básico
-        } else if (currentLevel === 3) {
-          if (planLower.includes('elite') || planLower.includes('élite')) levelPercentage = 25;
-          else if (planLower.includes('pro')) levelPercentage = 20;
-          else if (planLower.includes('avanzado')) levelPercentage = 15;
-          else levelPercentage = 10; // Básico
+      const userLevel = userProfile?.level || 1;
+      const newPercentage = calculatePercentage(userLevel, planName);
+
+      const updateData: any = {
+        plan: planName,
+        percentage: newPercentage
+      };
+      if (planId) {
+        updateData.plan_id = planId;
+      }
+
+      const { error: userUpdateError } = await client
+        .from('users')
+        .update(updateData)
+        .eq('id', currentTx.user_id);
+
+      if (userUpdateError) throw userUpdateError;
+
+      // 4. Traverse sponsor hierarchy (Levels 1, 2, 3)
+      const sponsors: {
+        level1?: any;
+        level2?: any;
+        level3?: any;
+      } = {};
+
+      let currentReferredId = currentTx.user_id;
+      for (let level = 1; level <= 3; level++) {
+        const { data: referral } = await client
+          .from('referrals')
+          .select('referrer_id')
+          .eq('referred_id', currentReferredId)
+          .single();
+
+        if (!referral || !referral.referrer_id) break;
+
+        const { data: referrer } = await client
+          .from('users')
+          .select('id, percentage, name, plan, level, xp')
+          .eq('id', referral.referrer_id)
+          .single();
+
+        if (referrer) {
+          if (level === 1) sponsors.level1 = referrer;
+          if (level === 2) sponsors.level2 = referrer;
+          if (level === 3) sponsors.level3 = referrer;
         }
 
-        const effectiveCommissionPercentage = referrer.percentage * (levelPercentage / 100);
-        const commissionAmount = amount * (effectiveCommissionPercentage / 100);
-        
-        if (commissionAmount > 0) {
-          await supabase.from('transactions').insert({
-            user_id: referral.referrer_id,
-            referred_id: tx.user_id,
-            amount: commissionAmount,
-            commission: effectiveCommissionPercentage,
-            type: 'referral_commission',
-            status: 'completed',
-            nivel_red: currentLevel
-          });
+        currentReferredId = referral.referrer_id;
+      }
 
-          // Update referrer's wallet balance
-          await updateWalletBalance(referral.referrer_id);
+      // 5. Calculate multi-level commissions using the centralized Commission Engine
+      const commissionResult = calculateMultiLevelCommissions({
+        purchaseTxId: currentTx.id,
+        buyerId: currentTx.user_id,
+        baseAmount: amount,
+        sponsors
+      });
 
-          // Notify Referrer
-          await sendNotification({
-            userId: referral.referrer_id,
-            title: `¡Comisión de Red (Nivel ${currentLevel})!`,
-            message: `Has recibido $${commissionAmount.toLocaleString('es-CO')} por la compra de un referido en tu nivel ${currentLevel}.`,
-            type: 'success'
-          });
-          
-          // Add XP for referral buying plan (+600 XP)
-          const { data: refProfile } = await supabase.from('users').select('xp, level, plan').eq('id', referral.referrer_id).single();
-          if (refProfile) {
-            const xpGained = 600; // +600 XP for active referral plan purchase
-            const newXp = (refProfile.xp || 0) + xpGained;
-            let newLevel = calculateLevelFromXP(newXp);
-            if (newLevel > 100) newLevel = 100;
-            let newPercentage = refProfile.percentage;
+      console.log(`[COMMISSION ENGINE] Purchase ${currentTx.id}: Base = $${amount}, MaxCap(70%) = $${commissionResult.maxAllowedCommission}, OriginalSum = $${commissionResult.totalOriginalCommission}, FinalSum = $${commissionResult.totalFinalCommission}, Prorated = ${commissionResult.exceededCap}`);
 
-            if (newLevel > (refProfile.level || 1)) {
-              newPercentage = calculatePercentage(newLevel, refProfile.plan || 'Básico');
-            }
+      // 6. Record commission transactions and update wallets
+      for (const comm of commissionResult.commissions) {
+        if (comm.adjustedAmount <= 0) continue;
 
-            await supabase.from('users').update({ xp: newXp, level: newLevel, percentage: newPercentage }).eq('id', referral.referrer_id);
+        const insertPayload: any = {
+          user_id: comm.beneficiaryId,
+          referred_id: comm.referredId,
+          amount: comm.adjustedAmount,
+          commission: comm.effectiveRate,
+          type: 'referral_commission',
+          status: 'completed',
+          nivel_red: comm.nivelRed,
+          receipt_url: `commission_for_${currentTx.id}`
+        };
+
+        const { error: commError } = await client
+          .from('transactions')
+          .insert(insertPayload);
+
+        if (commError) {
+          console.error(`Error inserting commission for sponsor ${comm.beneficiaryId}:`, commError);
+          continue;
+        }
+
+        // Update sponsor's wallet balance
+        await updateWalletBalance(comm.beneficiaryId);
+
+        // Notify Referrer
+        await sendNotification({
+          userId: comm.beneficiaryId,
+          title: `¡Comisión de Red (Nivel ${comm.nivelRed})!`,
+          message: `Has recibido $${comm.adjustedAmount.toLocaleString('es-CO')} por la compra de un referido en tu nivel ${comm.nivelRed}.${comm.wasAdjusted ? ' (Ajuste proporcional por tope del 70%)' : ''}`,
+          type: 'success'
+        });
+
+        // Add XP (+600 XP) for referral buying plan
+        const { data: refProfile } = await client
+          .from('users')
+          .select('xp, level, plan, percentage')
+          .eq('id', comm.beneficiaryId)
+          .single();
+
+        if (refProfile) {
+          const xpGained = 600;
+          const newXp = (refProfile.xp || 0) + xpGained;
+          let newLevel = calculateLevelFromXP(newXp);
+          if (newLevel > 100) newLevel = 100;
+          let newPercentage = refProfile.percentage;
+
+          if (newLevel > (refProfile.level || 1)) {
+            newPercentage = calculatePercentage(newLevel, refProfile.plan || 'Básico');
           }
+
+          await client
+            .from('users')
+            .update({ xp: newXp, level: newLevel, percentage: newPercentage })
+            .eq('id', comm.beneficiaryId);
         }
       }
 
-      currentReferredId = referral.referrer_id;
-      currentLevel++;
+      // Notify Buyer that plan is approved
+      await sendNotification({
+        userId: currentTx.user_id,
+        title: 'Plan Activado',
+        message: `Tu plan ${planName} ha sido activado con éxito. ¡Disfruta de tus beneficios!`,
+        type: 'success'
+      });
+
+      await evaluateTasks(currentTx.user_id, {
+        event_type: 'PLAN_PURCHASE',
+        metadata: { plan_id: planName }
+      });
+
+      return {
+        success: true,
+        commissionResult
+      };
+    } finally {
+      releaseTxLock();
     }
-
-    // Notify User that plan is approved
-    await sendNotification({
-      userId: tx.user_id,
-      title: 'Plan Activado',
-      message: `Tu plan ${planName} ha sido activado con éxito. ¡Disfruta de tus beneficios!`,
-      type: 'success'
-    });
-
-    await evaluateTasks(tx.user_id, {
-      event_type: 'PLAN_PURCHASE',
-      metadata: { plan_id: planName }
-    });
   }
 
   
@@ -964,7 +709,10 @@ async function startServer() {
 
   // Modular Routes
   const services = { 
-    supabase, 
+    supabase,
+    supabaseAdmin,
+    supabasePublic,
+    isUsingServiceRole,
     authenticate, 
     authorizeAdmin, 
     calculatePercentage, 
@@ -973,7 +721,12 @@ async function startServer() {
     evaluateTasks, 
     checkDailyReset, 
     getOrCreateProfile,
-    sendNotification 
+    sendNotification,
+    commissionEngine: {
+      calculateMultiLevelCommissions,
+      getTierMultiplier
+    },
+    financialMutex
   };
 
   app.use('/api', systemRoutes(services));

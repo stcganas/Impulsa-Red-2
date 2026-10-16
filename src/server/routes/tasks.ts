@@ -97,7 +97,10 @@ export function tasksRoutes(services: any) {
 
       if (taskError || !task) return res.status(404).json({ error: 'Tarea no encontrada' });
 
-      // 2. Check if already completed today
+      // Tasks that require evidence cannot be auto-completed directly
+      if (task.requires_evidence === true) {
+        return res.status(400).json({ error: 'Esta tarea requiere envío de evidencia para su revisión' });
+      }
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       

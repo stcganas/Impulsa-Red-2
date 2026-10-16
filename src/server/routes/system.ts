@@ -19,17 +19,9 @@ export function systemRoutes(services: any) {
   });
 ;
 
-  // Test policies
-  router.get('/test-policies', async (req, res) => {
-    try {
-      const sql = `
-        ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
-      `;
-      const { data, error } = await supabase.rpc('exec_sql', { sql });
-      res.json({ success: true, data, error });
-    } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
-    }
+  // System policies check (disabled exec_sql for security)
+  router.get('/test-policies', (req, res) => {
+    res.status(403).json({ error: 'Endpoint deprecated for security compliance' });
   });
 
 

@@ -20,16 +20,18 @@ export function usersRoutes(services: any) {
 
     const user = req.user;
 
-      const { action } = req.body; // 'normal_activity', 'suspicious_activity'
+      const { action } = req.body;
+      if (!['normal_activity', 'suspicious_activity'].includes(action)) {
+        return res.status(400).json({ error: 'Acción inválida. Solo se permite normal_activity o suspicious_activity.' });
+      }
       
       const { data: profile } = await supabase.from('users').select('trust_score').eq('id', user.id).single();
       
       if (profile) {
         let newScore = profile.trust_score !== undefined ? profile.trust_score : 100;
         
-        if (action === 'normal_activity') newScore = Math.min(100, newScore + 5);
+        if (action === 'normal_activity') newScore = Math.min(100, newScore + 1);
         else if (action === 'suspicious_activity') newScore = Math.max(0, newScore - 30);
-        else if (action === 'plan_purchase') newScore = Math.min(100, newScore + 20);
 
         await supabase.from('users').update({ trust_score: newScore }).eq('id', user.id);
       }

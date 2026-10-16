@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  postgres_test:
+    image: postgres:15-alpine
+    container_name: impulsared_postgres_test
+    environment:
+      POSTGRES_DB: impulsared_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: test_secure_password_local_only
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - pgdata_test:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d impulsared_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata_test:
+    driver: local
