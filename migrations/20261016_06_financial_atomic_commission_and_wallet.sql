@@ -1,31 +1,31 @@
--- ==============================================================================
--- IMPULSARED — FINANCIAL ENGINE ATOMICITY & IDEMPOTENCY MIGRATION (FASE 2B.1)
--- MIGRATION: 20261016_06_financial_atomic_commission_and_wallet.sql
--- OBJECTIVE:
---   1. Add persistent purchase_tx_id reference to transactions table.
---   2. Enforce strict uniqueness to prevent duplicate referral commissions per purchase & tier.
---   3. Add constraint to enforce non-negative transaction amounts.
---   4. Provide PostgreSQL atomic procedure for plan purchase approval with row-level locks (FOR UPDATE).
---   5. Provide PostgreSQL atomic function for withdrawal requests with user row locks (FOR UPDATE)
---      to prevent concurrent overdraw race conditions.
---   6. Preserve all historical data with zero destructive alterations.
--- STATUS: Local preparation. DO NOT EXECUTE AUTOMATICALLY AGAINST PRODUCTION.
--- ==============================================================================
+/**
+ * MIGRATION 06: FINANCIAL ATOMIC COMMISSION & WALLET (HARDENED WITH STRICT RPC AUTHORIZATION)
+ * 
+ * 1. Adds purchase_tx_id foreign key reference to transactions table.
+ * 2. Enforces strict uniqueness to prevent duplicate referral commissions per purchase & tier.
+ * 3. Add constraint to enforce non-negative transaction amounts.
+ * 4. Provide PostgreSQL atomic procedure for plan purchase approval with row-level locks (FOR UPDATE)
+ *    and strict session authorization check (auth.uid() == p_user_id or service_role).
+ * 5. Provide PostgreSQL atomic function for withdrawal requests with user row locks (FOR UPDATE)
+ *    and strict session authorization check (auth.uid() == p_user_id or service_role)
+ *    to prevent concurrent overdraw race conditions.
+ * 6. Preserve all historical data with zero destructive alterations.
+ * 
+ * STATUS: Local preparation. DO NOT EXECUTE AUTOMATICALLY AGAINST PRODUCTION.
+ */
 
 BEGIN;
 
--- ------------------------------------------------------------------------------
+-- --------------------------------------------------------------------------------
 -- PART 1: SCHEMA ENHANCEMENT FOR COMMISSION TRACEABILITY & IDEMPOTENCY
--- ------------------------------------------------------------------------------
+-- --------------------------------------------------------------------------------
 
 -- 1. Add purchase_tx_id foreign key column to track the exact plan purchase
 ALTER TABLE public.transactions
 ADD COLUMN IF NOT EXISTS purchase_tx_id uuid REFERENCES public.transactions(id) ON DELETE RESTRICT;
 
 -- Index for fast lookup of commissions by purchase transaction
-CREATE INDEX IF NOT EXISTS idx_transactions_purchase_tx_id 
-ON public.transactions(purchase_tx_id) 
-WHERE purchase_tx_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_transactions_purchase_tx_id ON public.transactions(purchase_tx_id) WHERE purchase_tx_id IS NOT NULL;
 
 -- 2. Unique partial constraint: Prevents duplicate commissions for the same purchase, beneficiary, and network level
 -- Note: Applies only to rows where purchase_tx_id is set, preserving backwards compatibility for legacy data
@@ -46,10 +46,10 @@ BEGIN
 END $$;
 
 
--- ------------------------------------------------------------------------------
--- PART 2: ATOMIC WITHDRAWAL RESERVATION FUNCTION
--- Prevents concurrent race conditions when users submit simultaneous withdrawal requests
--- ------------------------------------------------------------------------------
+-- --------------------------------------------------------------------------------
+-- PART 2: ATOMIC WITHDRAWAL RESERVATION FUNCTION (WITH STRICT AUTHORIZATION)
+-- --------------------------------------------------------------------------------
+
 CREATE OR REPLACE FUNCTION public.request_withdrawal_atomic(
   p_user_id uuid,
   p_amount numeric
@@ -62,7 +62,24 @@ DECLARE
   v_total_wallet_purchases numeric;
   v_available_balance numeric;
   v_tx_id uuid;
+  v_jwt_role text := current_setting('request.jwt.claim.role', true);
+  v_auth_uid uuid := auth.uid();
 BEGIN
+  -- 0. Strict Authorization Check (Executed BEFORE any data access or row locking)
+  IF v_jwt_role = 'authenticated' AND (v_auth_uid IS NULL OR v_auth_uid IS DISTINCT FROM p_user_id) THEN
+    RETURN jsonb_build_object(
+      'success', false, 
+      'error', 'Acceso denegado: no autorizado para operar sobre otra cuenta'
+    );
+  END IF;
+
+  IF v_jwt_role IS DISTINCT FROM 'authenticated' AND v_jwt_role IS DISTINCT FROM 'service_role' THEN
+    RETURN jsonb_build_object(
+      'success', false, 
+      'error', 'Acceso denegado: rol de solicitud no reconocido o no autorizado'
+    );
+  END IF;
+
   -- Validate amount
   IF p_amount IS NULL OR p_amount < 10000 THEN
     RETURN jsonb_build_object('success', false, 'error', 'El monto mínimo de retiro es $10.000 COP');
@@ -137,10 +154,10 @@ GRANT EXECUTE ON FUNCTION public.request_withdrawal_atomic(uuid, numeric) TO aut
 GRANT EXECUTE ON FUNCTION public.request_withdrawal_atomic(uuid, numeric) TO service_role;
 
 
--- ------------------------------------------------------------------------------
--- PART 3: ATOMIC PLAN PURCHASE WITH WALLET BALANCE
--- Validates balance, inserts purchase, updates user plan & balance in one transaction
--- ------------------------------------------------------------------------------
+-- --------------------------------------------------------------------------------
+-- PART 3: ATOMIC PLAN PURCHASE WITH WALLET BALANCE (WITH STRICT AUTHORIZATION)
+-- --------------------------------------------------------------------------------
+
 CREATE OR REPLACE FUNCTION public.purchase_plan_with_balance_atomic(
   p_user_id uuid,
   p_plan_id uuid
@@ -154,7 +171,24 @@ DECLARE
   v_total_wallet_purchases numeric;
   v_available_balance numeric;
   v_tx_id uuid;
+  v_jwt_role text := current_setting('request.jwt.claim.role', true);
+  v_auth_uid uuid := auth.uid();
 BEGIN
+  -- 0. Strict Authorization Check (Executed BEFORE any data access or row locking)
+  IF v_jwt_role = 'authenticated' AND (v_auth_uid IS NULL OR v_auth_uid IS DISTINCT FROM p_user_id) THEN
+    RETURN jsonb_build_object(
+      'success', false, 
+      'error', 'Acceso denegado: no autorizado para operar sobre otra cuenta'
+    );
+  END IF;
+
+  IF v_jwt_role IS DISTINCT FROM 'authenticated' AND v_jwt_role IS DISTINCT FROM 'service_role' THEN
+    RETURN jsonb_build_object(
+      'success', false, 
+      'error', 'Acceso denegado: rol de solicitud no reconocido o no autorizado'
+    );
+  END IF;
+
   -- 1. Fetch and validate plan
   SELECT * INTO v_plan_row
   FROM public.plans

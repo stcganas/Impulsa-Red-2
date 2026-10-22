@@ -1,5 +1,5 @@
 /**
- * IMPULSARED - UNIT TESTS FOR DATABASE SAFETY GUARD & MIGRATION RUNNER
+ * IMPULSARED - COMPREHENSIVE UNIT TESTS FOR HARDENED DATABASE SAFETY GUARD
  */
 
 import { verifyDisposableLocalDb } from './db_guard.ts';
@@ -19,17 +19,32 @@ function test(name: string, fn: () => void) {
 }
 
 console.log('\n======================================================');
-console.log('   IMPULSARED — DB GUARD & MIGRATION RUNNER UNIT TESTS');
+console.log('   IMPULSARED — COMPREHENSIVE DB GUARD TESTS');
 console.log('======================================================\n');
 
-test('Accepts valid local test URL', () => {
+test('Accepts valid local test URL (127.0.0.1:5433/impulsared_test)', () => {
   const valid = verifyDisposableLocalDb('postgres://postgres:pass@127.0.0.1:5433/impulsared_test');
   if (!valid) throw new Error('Expected true');
 });
 
-test('Accepts localhost test URL', () => {
-  const valid = verifyDisposableLocalDb('postgres://postgres:pass@localhost:5433/test_db');
+test('Accepts valid local test URL (localhost:5433/impulsared_test)', () => {
+  const valid = verifyDisposableLocalDb('postgres://postgres:pass@localhost:5433/impulsared_test');
   if (!valid) throw new Error('Expected true');
+});
+
+test('Accepts valid local test URL (IPv6 [::1]:5433/impulsared_test)', () => {
+  const valid = verifyDisposableLocalDb('postgres://postgres:pass@[::1]:5433/impulsared_test');
+  if (!valid) throw new Error('Expected true');
+});
+
+test('Rejects malformed URLs', () => {
+  let threw = false;
+  try {
+    verifyDisposableLocalDb('not-a-valid-url-string');
+  } catch {
+    threw = true;
+  }
+  if (!threw) throw new Error('Expected to reject malformed URL');
 });
 
 test('Rejects empty or missing URL', () => {
@@ -39,39 +54,71 @@ test('Rejects empty or missing URL', () => {
   } catch {
     threw = true;
   }
-  if (!threw) throw new Error('Expected to throw on empty URL');
+  if (!threw) throw new Error('Expected to reject empty URL');
 });
 
-test('Rejects remote / production URLs containing forbidden keywords', () => {
-  const forbidden = [
-    'postgres://user:pass@db.prod.supabase.co:5432/postgres',
-    'postgres://user:pass@aws-rds-cluster.amazon.com:5432/impulsared',
-    'postgres://user:pass@live-cluster.neon.tech:5432/main'
-  ];
-
-  for (const url of forbidden) {
-    let threw = false;
-    try {
-      verifyDisposableLocalDb(url);
-    } catch {
-      threw = true;
-    }
-    if (!threw) throw new Error(`Expected to throw on forbidden URL: ${url}`);
+test('Rejects remote hosts even if URL contains test keyword', () => {
+  let threw = false;
+  try {
+    verifyDisposableLocalDb('postgres://user:pass@db.prod.supabase.co:5433/impulsared_test');
+  } catch {
+    threw = true;
   }
+  if (!threw) throw new Error('Expected to reject remote host supabase.co');
 });
 
-test('Rejects local URLs without disposable test database name', () => {
+test('Rejects localhost.evil.example spoofing domain', () => {
+  let threw = false;
+  try {
+    verifyDisposableLocalDb('postgres://user:pass@localhost.evil.example:5433/impulsared_test');
+  } catch {
+    threw = true;
+  }
+  if (!threw) throw new Error('Expected to reject localhost.evil.example');
+});
+
+test('Rejects wildcard address 0.0.0.0', () => {
+  let threw = false;
+  try {
+    verifyDisposableLocalDb('postgres://user:pass@0.0.0.0:5433/impulsared_test');
+  } catch {
+    threw = true;
+  }
+  if (!threw) throw new Error('Expected to reject 0.0.0.0');
+});
+
+test('Rejects production database names', () => {
   let threw = false;
   try {
     verifyDisposableLocalDb('postgres://postgres:pass@127.0.0.1:5433/production_db');
   } catch {
     threw = true;
   }
-  if (!threw) throw new Error('Expected to throw when database name lacks test keyword');
+  if (!threw) throw new Error('Expected to reject production_db');
+});
+
+test('Rejects when test keyword is only in password but DB is production', () => {
+  let threw = false;
+  try {
+    verifyDisposableLocalDb('postgres://user:testpassword@127.0.0.1:5433/production_db');
+  } catch {
+    threw = true;
+  }
+  if (!threw) throw new Error('Expected to reject production_db even with test in password');
+});
+
+test('Rejects non-postgres protocol/schemas (http)', () => {
+  let threw = false;
+  try {
+    verifyDisposableLocalDb('http://127.0.0.1:5433/impulsared_test');
+  } catch {
+    threw = true;
+  }
+  if (!threw) throw new Error('Expected to reject non-postgres protocol');
 });
 
 console.log('\n======================================================');
-console.log(`TOTAL GUARD TESTS: PASSED = ${passed}, FAILED = ${failed}`);
+console.log(`TOTAL COMPREHENSIVE GUARD TESTS: PASSED = ${passed}, FAILED = ${failed}`);
 console.log('======================================================\n');
 
 if (failed > 0) {

@@ -1,11 +1,14 @@
 /**
- * IMPULSARED - CONTROLLED MIGRATION RUNNER
+ * IMPULSARED - REAL CONTROLLED MIGRATION RUNNER
  * 
- * Applies migrations 01 to 06 sequentially against a verified local disposable PostgreSQL database.
+ * Validates connection string safety via db_guard, connects using 'pg' client,
+ * executes migrations 01 to 06 sequentially within transactions, and stops on error.
  */
 
 import fs from 'fs';
 import path from 'path';
+import pkg from 'pg';
+const { Client } = pkg;
 import { verifyDisposableLocalDb } from './db_guard.ts';
 
 const MIGRATION_FILES = [
@@ -18,24 +21,38 @@ const MIGRATION_FILES = [
 ];
 
 export async function runMigrations(connectionString: string) {
+  // 1. Guard check before opening any connection
   verifyDisposableLocalDb(connectionString);
-
-  console.log('--- STARTING CONTROLLED MIGRATION SEQUENCE ---');
   
-  for (const file of MIGRATION_FILES) {
-    const filePath = path.resolve(process.cwd(), file);
-    if (!fs.existsSync(filePath)) {
-      throw new Error(`Migration file not found: ${file}`);
+  console.log('--- STARTING REAL CONTROLLED MIGRATION EXECUTION ---');
+  
+  const client = new Client({ connectionString });
+  
+  try {
+    await client.connect();
+    console.log('[MIGRATION] Connected successfully to disposable local PostgreSQL database.');
+
+    for (const file of MIGRATION_FILES) {
+      const filePath = path.resolve(process.cwd(), file);
+      if (!fs.existsSync(filePath)) {
+        throw new Error(`Migration file not found: ${file}`);
+      }
+      
+      const sqlContent = fs.readFileSync(filePath, 'utf8');
+      console.log(`[MIGRATION] Executing: ${file} ...`);
+      
+      // Execute migration SQL
+      await client.query(sqlContent);
+      
+      console.log(`[MIGRATION] ✅ CONFIRMED SUCCESS: ${file}`);
     }
-
-    const sqlContent = fs.readFileSync(filePath, 'utf8');
-    console.log(`[MIGRATION] Applying: ${file} ...`);
     
-    // In a real pg client connection, you would execute sqlContent here:
-    // await client.query(sqlContent);
-    
-    console.log(`[MIGRATION] ✅ SUCCESS: ${file}`);
+    console.log('--- ALL MIGRATIONS EXECUTED AND CONFIRMED SUCCESSFULLY ---');
+  } catch (err: any) {
+    console.error(`[MIGRATION ERROR] Migration sequence halted due to error: ${err.message}`);
+    throw err;
+  } finally {
+    await client.end();
+    console.log('[MIGRATION] Database connection closed.');
   }
-
-  console.log('--- ALL MIGRATIONS APPLIED SUCCESSFULLY ---');
 }
